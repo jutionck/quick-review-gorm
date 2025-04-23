@@ -1,8 +1,12 @@
-# Delete (Menghapus Data)
+# Relasi (Overview Singkat)
 
-## Penjelasan:
+## Penjelasan
 
-- Hard Delete: Menghapus record secara permanen dari database. Gunakan `db.Delete(&instanceModel, id) atau db.Where(...).Delete(&Model{})`.
-- Soft Delete: Tidak benar-benar menghapus data, melainkan menandainya sebagai "terhapus" (biasanya dengan mengisi kolom `deleted_at`). GORM mendukung ini secara otomatis jika model memiliki field `gorm.DeletedAt`(yang sudah ada di `gorm.Model`). Saat menggunakan `db.Delete()` pada model dengan `DeletedAt`, GORM akan melakukan UPDATE `deleted_at` alih-alih DELETE.
-- Mengambil Record yang Di-Soft Delete: Secara default, GORM akan mengecualikan record yang di-soft delete dari hasil query. Gunakan `db.Unscoped().Find(...)` atau `db.Unscoped().Where(...)` untuk menyertakan record yang di-soft delete.
-- Menghapus Permanen (dengan Soft Delete aktif): Gunakan `db.Unscoped().Delete(...).`
+- Database relasional seringkali memiliki hubungan antar tabel (misal: satu User memiliki banyak Post, satu Product dimiliki oleh satu Category). GORM memungkinkan pendefinisian relasi ini dalam struct Go.
+- Jenis Relasi: One-to-One, One-to-Many, Many-to-Many.
+- Pendefinisian: Ditentukan dengan menambahkan field struct yang merupakan pointer atau slice ke struct model lain, seringkali dikombinasikan dengan tag `gorm:"..."` seperti `foreignKey`, `references`, `many2many`.
+
+## Loading Relasi
+
+- Lazy Loading: Relasi tidak diambil secara otomatis saat query model utama. Perlu query terpisah untuk mengambil data relasi (berpotensi N+1 problem).
+- Eager Loading: Mengambil data relasi bersamaan dengan model utama, biasanya menggunakan metode `Preload()`. Ini lebih efisien untuk mengambil banyak data relasi sekaligus.

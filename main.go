@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"log"
 
 	"gorm.io/driver/sqlite"
@@ -19,7 +18,20 @@ type User struct {
 	ID        uint           `gorm:"primaryKey"`
 	Name      string         `gorm:"not null"`
 	Email     string         `gorm:"unique"`
-	DeletedAt gorm.DeletedAt `gorm:"index"` // Ditambahkan untuk demo Soft Delete
+	DeletedAt gorm.DeletedAt `gorm:"index"` // Soft Delete
+	// Relasi One-to-Many: Satu User punya banyak Post
+	Posts []Post // Slice of Post. GORM akan mencocokkan UserID di tabel posts
+}
+
+// Model baru untuk demonstrasi relasi
+type Post struct {
+	gorm.Model // ID, CreatedAt, UpdatedAt, DeletedAt
+	Title      string
+	Body       string
+	UserID     uint // Kolom foreign key yang menghubungkan Post ke User. Harus ada.
+	// Relasi Many-to-One: Banyak Post dimiliki oleh satu User
+	// Field ini opsional, digunakan GORM untuk memuat data User saat Preload
+	User User
 }
 
 func main() {
@@ -43,110 +55,73 @@ func main() {
 
 	// --- Bagian 3: Auto Migrate ---
 	log.Println("Running auto migration...")
-	// AutoMigrate lagi setelah menambahkan DeletedAt ke User
-	err = db.AutoMigrate(&Product{}, &User{})
+	// AutoMigrate semua model, termasuk Post
+	err = db.AutoMigrate(&Product{}, &User{}, &Post{})
 	if err != nil {
 		log.Fatalf("Failed to auto migrate: %v", err)
 	}
 	log.Println("Database auto migration finished. Tables created/updated.")
 
-	// --- Re-Create Data for Demo ---
-	log.Println("\n--- Re-Creating Data for Delete Demo ---")
-	// Hati-hati! Menghapus semua data produk dan user
-	db.Unscoped().Exec("DELETE FROM products") // Gunakan Unscoped untuk menghapus permanen jika soft delete aktif
+	// --- Re-Create Data for Demo (minimal untuk demo relasi) ---
+	log.Println("\n--- Re-Creating Minimal Data for Relasi Demo ---")
+	db.Unscoped().Exec("DELETE FROM products")
 	db.Unscoped().Exec("DELETE FROM users")
+	db.Unscoped().Exec("DELETE FROM posts") // Hapus data post juga
 	db.Exec("DELETE FROM sqlite_sequence WHERE name='products'")
 	db.Exec("DELETE FROM sqlite_sequence WHERE name='users'")
+	db.Exec("DELETE FROM sqlite_sequence WHERE name='posts'")
 
-	productToDeleteHard := Product{Code: "HARDDEL", Price: 10}
-	db.Create(&productToDeleteHard)
-	log.Printf("Product created for hard delete: %+v\n", productToDeleteHard)
+	user1 := User{Name: "User A", Email: "user_a@example.com"}
+	user2 := User{Name: "User B", Email: "user_b@example.com"}
+	db.Create(&[]User{user1, user2})
+	log.Printf("Created users with IDs: %d, %d\n", user1.ID, user2.ID)
 
-	userToDeleteSoft := User{Name: "User Soft Delete", Email: "softdelete@example.com"}
-	db.Create(&userToDeleteSoft)
-	log.Printf("User created for soft delete: %+v\n", userToDeleteSoft)
+	// Buat beberapa post, kaitkan dengan user
+	postsToCreate := []Post{
+		{Title: "Post Pertama User A", Body: "Ini isi post pertama", UserID: user1.ID},
+		{Title: "Post Kedua User A", Body: "Ini isi post kedua", UserID: user1.ID},
+		{Title: "Post Pertama User B", Body: "Ini isi post user B", UserID: user2.ID},
+	}
+	db.Create(&postsToCreate)
+	log.Println("Created demo posts linked to users.")
 
-	userToDeletePermanent := User{Name: "User Perm Delete", Email: "permdelete@example.com"}
-	db.Create(&userToDeletePermanent)
-	log.Printf("User created for permanent delete: %+v\n", userToDeletePermanent)
+	// --- Bagian 4: Operasi CRUD & Relasi ---
+	log.Println("\n--- Demonstrating Basic Relasi (Preload) ---")
 
-	log.Println("Demo data created for delete.")
+	// Ambil User pertama dan PRELOAD semua Post terkait
+	var userWithPosts User
+	// db.First(&userWithPosts, 1) // Jika pakai ini, user.Posts akan kosong
 
-	// --- Bagian 4: Operasi CRUD - Delete ---
-	log.Println("\n--- Deleting Data ---")
-
-	// Hard Delete Product (karena Product pakai gorm.Model, tapi kita hapus by ID)
-	// Atau bisa db.Delete(&Product{}, productToDeleteHard.ID)
-	result := db.Delete(&productToDeleteHard)
+	result := db.Preload("Posts").First(&userWithPosts, user1.ID) // Load User1 dan Posts-nya
 	if result.Error != nil {
-		log.Printf("Failed to hard delete product: %v\n", result.Error)
+		log.Printf("Failed to find user with posts: %v\n", result.Error)
 	} else {
-		log.Printf("Product ID %d hard deleted. Rows affected: %d\n", productToDeleteHard.ID, result.RowsAffected)
+		log.Printf("Found User '%s' with Posts:\n", userWithPosts.Name)
+		log.Printf("Number of posts loaded: %d\n", len(userWithPosts.Posts))
+		for i, post := range userWithPosts.Posts {
+			log.Printf("  Post %d: ID=%d, Title='%s'\n", i+1, post.ID, post.Title)
+		}
 	}
 
-	// Coba cari produk yang sudah di hard delete (seharusnya tidak ketemu)
-	var deletedProductCheck Product
-	result = db.First(&deletedProductCheck, productToDeleteHard.ID)
-	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-		log.Println("Product not found after hard delete (expected).")
-	} else if result.Error != nil {
-		log.Printf("Error finding product after hard delete: %v\n", result.Error)
-	} else {
-		log.Println("Product found after hard delete (UNEXPECTED!).")
-	}
-
-	log.Println("") // Newline for clarity
-
-	// Soft Delete User (User pakai DeletedAt)
-	result = db.Delete(&userToDeleteSoft) // GORM akan SET DeletedAt
+	// Ambil semua User dan PRELOAD semua Post terkait
+	var allUsersWithPosts []User
+	result = db.Preload("Posts").Find(&allUsersWithPosts)
 	if result.Error != nil {
-		log.Printf("Failed to soft delete user: %v\n", result.Error)
+		log.Printf("Failed to find all users with posts: %v\n", result.Error)
 	} else {
-		log.Printf("User ID %d soft deleted. Rows affected: %d\n", userToDeleteSoft.ID, result.RowsAffected)
-		// userToDeleteSoft.DeletedAt sekarang terisi timestamp
-		log.Printf("User after soft delete: %+v\n", userToDeleteSoft)
+		log.Println("\nFound All Users with Posts:")
+		for _, user := range allUsersWithPosts {
+			log.Printf("- User '%s' has %d posts.\n", user.Name, len(user.Posts))
+		}
 	}
 
-	// Coba cari user yang sudah di soft delete (seharusnya tidak ketemu by default)
-	var softDeletedUserCheck User
-	result = db.First(&softDeletedUserCheck, userToDeleteSoft.ID)
-	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-		log.Println("User not found after soft delete (expected, default query excludes soft deleted).")
-	} else if result.Error != nil {
-		log.Printf("Error finding user after soft delete: %v\n", result.Error)
-	} else {
-		log.Println("User found after soft delete (UNEXPECTED!).")
-	}
-
-	// Cari user yang sudah di soft delete MENGGUNAKAN Unscoped()
-	var unscopedSoftDeletedUserCheck User
-	result = db.Unscoped().First(&unscopedSoftDeletedUserCheck, userToDeleteSoft.ID)
-	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-		log.Println("User not found using Unscoped (UNEXPECTED!).")
-	} else if result.Error != nil {
-		log.Printf("Error finding user using Unscoped: %v\n", result.Error)
-	} else {
-		log.Printf("User found using Unscoped: %+v\n", unscopedSoftDeletedUserCheck) // DeletedAt field should be populated
-	}
-
-	// Menghapus permanen (ketika soft delete aktif) menggunakan Unscoped()
-	log.Println("\nPerforming permanent delete...")
-	result = db.Unscoped().Delete(&userToDeletePermanent)
+	// Mencari Post dan PRELOAD informasi User-nya (relasi Many-to-One)
+	var postWithUser Post
+	result = db.Preload("User").First(&postWithUser, postsToCreate[0].ID) // Ambil post pertama dan load User-nya
 	if result.Error != nil {
-		log.Printf("Failed to permanent delete user: %v\n", result.Error)
+		log.Printf("Failed to find post with user: %v\n", result.Error)
 	} else {
-		log.Printf("User ID %d permanently deleted. Rows affected: %d\n", userToDeletePermanent.ID, result.RowsAffected)
-	}
-
-	// Coba cari user yang sudah di permanent delete (seharusnya tidak ketemu)
-	var permanentDeletedUserCheck User
-	result = db.Unscoped().First(&permanentDeletedUserCheck, userToDeletePermanent.ID) // Gunakan Unscoped untuk memastikan cek
-	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
-		log.Println("User not found after permanent delete (expected).")
-	} else if result.Error != nil {
-		log.Printf("Error finding user after permanent delete: %v\n", result.Error)
-	} else {
-		log.Println("User found after permanent delete (UNEXPECTED!).")
+		log.Printf("\nFound Post '%s' by User '%s' (loaded via Preload):\n", postWithUser.Title, postWithUser.User.Name)
 	}
 
 	log.Println("Application finished.")

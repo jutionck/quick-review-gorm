@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"log"
 
 	"gorm.io/driver/sqlite"
@@ -8,41 +9,28 @@ import (
 )
 
 // --- Bagian 2: Definisi Model ---
-type Task struct {
-	gorm.Model // Menyertakan ID, CreatedAt, UpdatedAt, DeletedAt
-	Task       string
-	IsComplete bool
-}
-
-// Definisi model User tanpa gorm.Model untuk variasi
-type User struct {
-	ID    uint   `gorm:"primaryKey"` // Kustomisasi primary key
-	Name  string `gorm:"not null"`
-	Email string `gorm:"unique;size:100"` // Kolom 'email' unique, tipe varchar(100)
-	// DeletedAt gorm.DeletedAt `gorm:"index"`
-}
-
-// Tamabahn model baru
 type Product struct {
-	gorm.Model
-	Code  string `gorm:"unique;size:10"`
-	Price uint
+	gorm.Model        // Sudah termasuk DeletedAt
+	Code       string `gorm:"unique;size:10"`
+	Price      uint
+}
+
+type User struct {
+	ID        uint           `gorm:"primaryKey"`
+	Name      string         `gorm:"not null"`
+	Email     string         `gorm:"unique"`
+	DeletedAt gorm.DeletedAt `gorm:"index"` // Ditambahkan untuk demo Soft Delete
 }
 
 func main() {
 	// --- Bagian 1: Koneksi Database ---
 	log.Println("Attempting to connect to database...")
-
-	// Koneksi ke database SQLite. File 'gorm.db' akan dibuat.
 	db, err := gorm.Open(sqlite.Open("gorm.db"), &gorm.Config{})
-
 	if err != nil {
 		log.Fatalf("Failed to connect database: %v", err)
 	}
-
 	log.Println("Database connection successfully opened.")
 
-	// Menutup koneksi saat fungsi main selesai (opsional, tapi praktik baik)
 	sqlDB, err := db.DB()
 	if err != nil {
 		log.Fatalf("Failed to get underlying DB instance: %v", err)
@@ -55,79 +43,110 @@ func main() {
 
 	// --- Bagian 3: Auto Migrate ---
 	log.Println("Running auto migration...")
-	// AutoMigrate akan membuat/memperbarui skema tabel berdasarkan model.
-	err = db.AutoMigrate(&Task{}, &User{}, &Product{})
+	// AutoMigrate lagi setelah menambahkan DeletedAt ke User
+	err = db.AutoMigrate(&Product{}, &User{})
 	if err != nil {
 		log.Fatalf("Failed to auto migrate: %v", err)
 	}
 	log.Println("Database auto migration finished. Tables created/updated.")
+
 	// --- Re-Create Data for Demo ---
-	log.Println("\n--- Re-Creating Data for Update Demo ---")
-	db.Exec("DELETE FROM products")                              // Hati-hati! Menghapus semua data produk.
-	db.Exec("DELETE FROM users")                                 // Hati-hati! Menghapus semua data user.
-	db.Exec("DELETE FROM sqlite_sequence WHERE name='products'") // Reset auto-increment SQLite
-	db.Exec("DELETE FROM sqlite_sequence WHERE name='users'")    // Reset auto-increment SQLite
+	log.Println("\n--- Re-Creating Data for Delete Demo ---")
+	// Hati-hati! Menghapus semua data produk dan user
+	db.Unscoped().Exec("DELETE FROM products") // Gunakan Unscoped untuk menghapus permanen jika soft delete aktif
+	db.Unscoped().Exec("DELETE FROM users")
+	db.Exec("DELETE FROM sqlite_sequence WHERE name='products'")
+	db.Exec("DELETE FROM sqlite_sequence WHERE name='users'")
 
-	productsToCreate := []Product{
-		{Code: "P001", Price: 50},
-		{Code: "P002", Price: 75},
-	}
-	db.Create(&productsToCreate)
+	productToDeleteHard := Product{Code: "HARDDEL", Price: 10}
+	db.Create(&productToDeleteHard)
+	log.Printf("Product created for hard delete: %+v\n", productToDeleteHard)
 
-	usersToCreate := []User{
-		{Name: "Budi Santoso", Email: "budi@example.com"},
-		{Name: "Siti Aminah", Email: "siti@example.com"},
-	}
-	db.Create(&usersToCreate)
-	log.Println("Demo data created for update.")
+	userToDeleteSoft := User{Name: "User Soft Delete", Email: "softdelete@example.com"}
+	db.Create(&userToDeleteSoft)
+	log.Printf("User created for soft delete: %+v\n", userToDeleteSoft)
 
-	// --- Bagian 4: Operasi CRUD - Update ---
-	log.Println("\n--- Updating Data ---")
+	userToDeletePermanent := User{Name: "User Perm Delete", Email: "permdelete@example.com"}
+	db.Create(&userToDeletePermanent)
+	log.Printf("User created for permanent delete: %+v\n", userToDeletePermanent)
 
-	// Update menggunakan Save: Ambil record, ubah field, lalu Save
-	var productToUpdate Product
-	result := db.First(&productToUpdate, 1) // Asumsikan produk ID 1 ada
+	log.Println("Demo data created for delete.")
+
+	// --- Bagian 4: Operasi CRUD - Delete ---
+	log.Println("\n--- Deleting Data ---")
+
+	// Hard Delete Product (karena Product pakai gorm.Model, tapi kita hapus by ID)
+	// Atau bisa db.Delete(&Product{}, productToDeleteHard.ID)
+	result := db.Delete(&productToDeleteHard)
 	if result.Error != nil {
-		log.Printf("Product with ID 1 not found for update (Save): %v\n", result.Error)
+		log.Printf("Failed to hard delete product: %v\n", result.Error)
 	} else {
-		log.Printf("Product before update (Save): %+v\n", productToUpdate)
-		productToUpdate.Price = 150        // Ubah harga
-		result = db.Save(&productToUpdate) // Simpan perubahan
-		if result.Error != nil {
-			log.Printf("Failed to update product using Save: %v\n", result.Error)
-		} else {
-			log.Printf("Product updated successfully using Save. New Price: %d\n", productToUpdate.Price)
-		}
+		log.Printf("Product ID %d hard deleted. Rows affected: %d\n", productToDeleteHard.ID, result.RowsAffected)
 	}
 
-	// Update menggunakan Updates (map): Ambil record, lalu Updates dengan map
-	var userToUpdate User
-	result = db.Where("email = ?", "siti@example.com").First(&userToUpdate) // Asumsikan user ini ada
-	if result.Error != nil {
-		log.Printf("User with email siti@example.com not found for update (Updates): %v\n", result.Error)
+	// Coba cari produk yang sudah di hard delete (seharusnya tidak ketemu)
+	var deletedProductCheck Product
+	result = db.First(&deletedProductCheck, productToDeleteHard.ID)
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		log.Println("Product not found after hard delete (expected).")
+	} else if result.Error != nil {
+		log.Printf("Error finding product after hard delete: %v\n", result.Error)
 	} else {
-		log.Printf("User before update (Updates): %+v\n", userToUpdate)
-		result = db.Model(&userToUpdate).Updates(map[string]interface{}{"Name": "Siti Aminah Updated", "Email": "siti.updated@example.com"}) // Update Nama dan Email
-		if result.Error != nil {
-			log.Printf("Failed to update user using Updates (map): %v\n", result.Error)
-		} else {
-			log.Printf("User updated successfully using Updates (map). New Name: %s, New Email: %s\n", userToUpdate.Name, userToUpdate.Email)
-		}
+		log.Println("Product found after hard delete (UNEXPECTED!).")
 	}
 
-	// Update menggunakan Updates (struct): Ambil record, lalu Updates dengan struct
-	var productToUpdate2 Product
-	result = db.First(&productToUpdate2, 2) // Asumsikan produk ID 2 ada
+	log.Println("") // Newline for clarity
+
+	// Soft Delete User (User pakai DeletedAt)
+	result = db.Delete(&userToDeleteSoft) // GORM akan SET DeletedAt
 	if result.Error != nil {
-		log.Printf("Product with ID 2 not found for update (Updates struct): %v\n", result.Error)
+		log.Printf("Failed to soft delete user: %v\n", result.Error)
 	} else {
-		log.Printf("Product before update (Updates struct): %+v\n", productToUpdate2)
-		result = db.Model(&productToUpdate2).Updates(Product{Price: 90}) // Hanya update Price (field lain di struct Product{Price: 90} adalah zero-value)
-		if result.Error != nil {
-			log.Printf("Failed to update product using Updates (struct): %v\n", result.Error)
-		} else {
-			log.Printf("Product updated successfully using Updates (struct). New Price: %d\n", productToUpdate2.Price)
-		}
+		log.Printf("User ID %d soft deleted. Rows affected: %d\n", userToDeleteSoft.ID, result.RowsAffected)
+		// userToDeleteSoft.DeletedAt sekarang terisi timestamp
+		log.Printf("User after soft delete: %+v\n", userToDeleteSoft)
+	}
+
+	// Coba cari user yang sudah di soft delete (seharusnya tidak ketemu by default)
+	var softDeletedUserCheck User
+	result = db.First(&softDeletedUserCheck, userToDeleteSoft.ID)
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		log.Println("User not found after soft delete (expected, default query excludes soft deleted).")
+	} else if result.Error != nil {
+		log.Printf("Error finding user after soft delete: %v\n", result.Error)
+	} else {
+		log.Println("User found after soft delete (UNEXPECTED!).")
+	}
+
+	// Cari user yang sudah di soft delete MENGGUNAKAN Unscoped()
+	var unscopedSoftDeletedUserCheck User
+	result = db.Unscoped().First(&unscopedSoftDeletedUserCheck, userToDeleteSoft.ID)
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		log.Println("User not found using Unscoped (UNEXPECTED!).")
+	} else if result.Error != nil {
+		log.Printf("Error finding user using Unscoped: %v\n", result.Error)
+	} else {
+		log.Printf("User found using Unscoped: %+v\n", unscopedSoftDeletedUserCheck) // DeletedAt field should be populated
+	}
+
+	// Menghapus permanen (ketika soft delete aktif) menggunakan Unscoped()
+	log.Println("\nPerforming permanent delete...")
+	result = db.Unscoped().Delete(&userToDeletePermanent)
+	if result.Error != nil {
+		log.Printf("Failed to permanent delete user: %v\n", result.Error)
+	} else {
+		log.Printf("User ID %d permanently deleted. Rows affected: %d\n", userToDeletePermanent.ID, result.RowsAffected)
+	}
+
+	// Coba cari user yang sudah di permanent delete (seharusnya tidak ketemu)
+	var permanentDeletedUserCheck User
+	result = db.Unscoped().First(&permanentDeletedUserCheck, userToDeletePermanent.ID) // Gunakan Unscoped untuk memastikan cek
+	if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		log.Println("User not found after permanent delete (expected).")
+	} else if result.Error != nil {
+		log.Printf("Error finding user after permanent delete: %v\n", result.Error)
+	} else {
+		log.Println("User found after permanent delete (UNEXPECTED!).")
 	}
 
 	log.Println("Application finished.")

@@ -1,7 +1,8 @@
-# Update (Mengubah Data)
+# Delete (Menghapus Data)
 
-## Penjelasan
+## Penjelasan:
 
-- `db.Save(&instanceModel)`: Jika instance model sudah punya Primary Key, GORM akan melakukan operasi UPDATE. Ini akan menyimpan semua field dari struct, termasuk yang belum diubah (mengubahnya jadi zero-value jika kosong).
-- `db.Model(&instanceModel).Updates(map[string]interface{}{"Kolom1": Nilai1, "Kolom2": Nilai2})` atau `db.Model(&instanceModel).Updates(StructDenganKolomYangDiubah{})`: Metode yang lebih fleksibel untuk hanya mengupdate kolom tertentu. Sangat disarankan daripada Save untuk update parsial.
-- Update dengan Where: Bisa mengupdate banyak record sekaligus tanpa mengambilnya terlebih dahulu: `db.Model(&Product{}).Where("price < ?", 50).Updates(Product{Price: 50})`.
+- Hard Delete: Menghapus record secara permanen dari database. Gunakan `db.Delete(&instanceModel, id) atau db.Where(...).Delete(&Model{})`.
+- Soft Delete: Tidak benar-benar menghapus data, melainkan menandainya sebagai "terhapus" (biasanya dengan mengisi kolom `deleted_at`). GORM mendukung ini secara otomatis jika model memiliki field `gorm.DeletedAt`(yang sudah ada di `gorm.Model`). Saat menggunakan `db.Delete()` pada model dengan `DeletedAt`, GORM akan melakukan UPDATE `deleted_at` alih-alih DELETE.
+- Mengambil Record yang Di-Soft Delete: Secara default, GORM akan mengecualikan record yang di-soft delete dari hasil query. Gunakan `db.Unscoped().Find(...)` atau `db.Unscoped().Where(...)` untuk menyertakan record yang di-soft delete.
+- Menghapus Permanen (dengan Soft Delete aktif): Gunakan `db.Unscoped().Delete(...).`

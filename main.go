@@ -7,6 +7,22 @@ import (
 	"gorm.io/gorm"
 )
 
+// --- Bagian 2: Definisi Model ---
+type Task struct {
+	gorm.Model // Menyertakan ID, CreatedAt, UpdatedAt, DeletedAt
+	Task       string
+	IsComplete bool
+}
+
+// Definisi model User tanpa gorm.Model untuk variasi
+type User struct {
+	ID    uint   `gorm:"primaryKey"` // Kustomisasi primary key
+	Name  string `gorm:"not null"`
+	Email string `gorm:"unique;size:100"` // Kolom 'email' unique, tipe varchar(100)
+	// Field untuk soft delete akan ditambahkan di branch selanjutnya
+	// DeletedAt gorm.DeletedAt `gorm:"index"`
+}
+
 func main() {
 	// --- Bagian 1: Koneksi Database ---
 	log.Println("Attempting to connect to database...")
@@ -30,9 +46,6 @@ func main() {
 		sqlDB.Close()
 		log.Println("Database connection closed.")
 	}()
-
-	// --- Bagian 2: Definisi Model ---
-	// Struct model akan ditambahkan di branch selanjutnya.
 
 	// --- Bagian 3: Auto Migrate ---
 	// Kode AutoMigrate akan ditambahkan di branch selanjutnya.

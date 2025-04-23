@@ -1,30 +1,25 @@
-# Pengantar ORM dan GORM
+# Definisi Model
 
 ## Penjelasan
 
-Apa itu **ORM (Object-Relational Mapper)?** ORM adalah teknik atau tool yang memetakan (mapping) objek dalam kode program (seperti struct di Go) ke tabel dalam database relasional. Ini memungkinkan Anda berinteraksi dengan database menggunakan sintaks bahasa pemrograman Anda, bukan SQL mentah.
+Model di GORM direpresentasikan sebagai struct Go. Setiap field dalam struct secara default akan dipetakan menjadi kolom di tabel database.
 
-## Mengapa Menggunakan ORM (dan GORM)?
+## Konvensi GORM
 
-- Mengurangi boilerplate code SQL.
-- Meningkatkan produktivitas.
-- Memudahkan pengelolaan skema database (migrasi).
-- Menyediakan abstraksi untuk berbagai jenis database.
+- Nama struct (PascalCase) biasanya dipetakan ke nama tabel (snake_case, plural): `User` -> `users`, `Task` -> `tasks`.
+- Nama field struct (PascalCase) dipetakan ke nama kolom (snake_case): `CreatedAt` -> `created_at`, `TaskName` -> `task_name`.
 
-## Apa itu GORM?
+## gorm.Model
 
-GORM adalah ORM populer untuk Go, dikenal karena kemudahan penggunaan, fitur lengkap (`associations`, `hooks`, `eager loading`, `transactions`, dll.), dan komunitas yang aktif.
+Ini adalah struct bawaan GORM yang menyediakan field umum seperti ID (primary key auto-increment), `CreatedAt`, `UpdatedAt`, dan `DeletedAt` (untuk soft delete). Sangat disarankan untuk menyertakan ini di sebagian besar model.
 
-## Prasyarat Singkat
+## GORM Tags (gorm:"...")
 
-Sudah memahami dasar Go (struct, pointer, slice, error handling)
+Digunakan untuk mengkustomisasi mapping atau menambahkan constraint pada kolom, contoh:
 
-# Koneksi Database
-
-## Penjelasan
-
-- GORM memerlukan driver spesifik untuk setiap jenis database (`PostgreSQL`, `MySQL`, `SQLite`, `SQL Server`, dll.) Driver ini yang menerjemahkan perintah GORM ke SQL yang sesuai.
-- Koneksi database biasanya menggunakan Data Source Name (DSN) yang berisi informasi seperti `user`, `password`, `host`, `port`, `nama database`.
-- Fungsi utama untuk membuka koneksi adalah `gorm.Open()`. - Fungsi ini mengembalikan instance `gorm.DB` yang akan kita gunakan untuk semua operasi database, dan sebuah error.
-- Penting untuk selalu memeriksa error setelah `gorm.Open()`.
-- Menutup koneksi database saat aplikasi berhenti (`db.Close()` - meskipun ini kurang umum pada aplikasi web modern yang menjaga koneksi tetap hidup).
+- `gorm:"column:nama_kolom_kustom"`: Mengubah nama kolom.
+- `gorm:"type:varchar(100)"`: Menentukan tipe data SQL.
+- `gorm:"primaryKey"`: Menandai sebagai primary key.
+- `gorm:"unique"`: Menambahkan constraint unique.
+- `gorm:"not null"`: Menambahkan constraint not null.
+- `gorm:"default:0"`: Menambahkan nilai default.

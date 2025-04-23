@@ -1,8 +1,7 @@
-# Migrasi Database
+# Create (Menambah Data)
 
 ## Penjelasan
 
-Setelah mendefinisikan model, kita perlu membuat tabel yang sesuai di database. Proses ini disebut migrasi.
-
-GORM memiliki fitur `AutoMigrate()` yang secara otomatis membuat tabel, menambahkan kolom yang hilang, dan membuat index berdasarkan definisi model.
-Penting: `AutoMigrate` tidak menghapus kolom/tabel yang sudah ada, atau mengubah tipe data kolom yang sudah ada. Untuk skenario produksi yang lebih kompleks, disarankan menggunakan tool migrasi terpisah (seperti `golang-migrate`).
+- Untuk menambah data baru, buat instance struct model, isi field-nya, lalu panggil `db.Create(&instanceModel)`.
+- GORM akan mengisi field `ID`, `CreatedAt`, dan `UpdatedAt` (jika menggunakan `gorm.Model`) setelah data berhasil disimpan.
+- Kamu bisa menyimpan banyak record sekaligus dengan melewatkan slice of models ke `db.Create()`.

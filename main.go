@@ -55,8 +55,33 @@ func main() {
 	}
 	log.Println("Database auto migration finished. Tables created/updated.")
 
-	// --- Bagian 4: Operasi CRUD ---
-	// Kode Create, Read, Update, Delete akan ditambahkan di branch selanjutnya.
+	// --- Bagian 4: Operasi CRUD - Create ---
+	log.Println("\n--- Creating Data ---")
+
+	// Tambah produk baru
+	newTask := Task{Task: "Makan", IsComplete: true}
+	result := db.Create(&newTask) // Mengembalikan *gorm.DB
+
+	if result.Error != nil {
+		log.Printf("Failed to create task: %v\n", result.Error)
+	} else {
+		log.Printf("Task created successfully with ID: %d (RowsAffected: %d)\n", newTask.ID, result.RowsAffected)
+	}
+
+	// Tambah beberapa user sekaligus
+	usersToCreate := []User{
+		{Name: "Budi Santoso", Email: "budi@example.com"},
+		{Name: "Siti Aminah", Email: "siti@example.com"},
+		{Name: "Agus Dharma", Email: "agus@example.com"},
+	}
+	result = db.Create(&usersToCreate)
+	if result.Error != nil {
+		log.Printf("Failed to create users: %v\n", result.Error)
+	} else {
+		log.Printf("Users created successfully. (RowsAffected: %d)\n", result.RowsAffected)
+		// ID dari setiap user di slice juga akan terisi setelah operasi create
+		// log.Printf("Created Users (with IDs): %+v\n", usersToCreate) // Bisa dicetak
+	}
 
 	log.Println("Application finished.")
 }

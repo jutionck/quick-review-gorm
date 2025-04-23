@@ -1,24 +1,7 @@
-# Read (Membaca Data)
+# Update (Mengubah Data)
 
 ## Penjelasan
 
-### Membaca satu record
-
-- `db.First(&instanceModel, id)`: Mengambil record pertama berdasarkan primary key ID.
-- `db.First(&instanceModel, "condition")`: Mengambil record pertama yang cocok dengan kondisi string (kurang disarankan karena rentan SQL injection).
-- `db.Where("condition", args...).First(&instanceModel)`: Cara yang lebih aman dan umum menggunakan Where.
-- `db.Last(&instanceModel)`: Mengambil record terakhir.
-
-### Membaca banyak record
-
-- `db.Find(&sliceOfModels)`: Mengambil semua record.
-- `db.Where("condition", args...).Find(&sliceOfModels)`: Mengambil record yang cocok dengan kondisi.
-
-### Chaining Methods: Metode query GORM bisa dirangkai (chained)
-
-**`db.Where(...).Order(...).Limit(...).Offset(...).Find(...)`.**
-
-- `Where("kolom operator ?", nilai)`: Filtering data (misal: `"price > ?"`, `"name LIKE ?"`, `"id IN ?"`).
-- `Order("kolom [asc|desc]")`: Mengurutkan hasil.
-- `Limit(n)`: Membatasi jumlah record yang diambil.
-- `Offset(n)`: Melewati n record (untuk pagination).
+- `db.Save(&instanceModel)`: Jika instance model sudah punya Primary Key, GORM akan melakukan operasi UPDATE. Ini akan menyimpan semua field dari struct, termasuk yang belum diubah (mengubahnya jadi zero-value jika kosong).
+- `db.Model(&instanceModel).Updates(map[string]interface{}{"Kolom1": Nilai1, "Kolom2": Nilai2})` atau `db.Model(&instanceModel).Updates(StructDenganKolomYangDiubah{})`: Metode yang lebih fleksibel untuk hanya mengupdate kolom tertentu. Sangat disarankan daripada Save untuk update parsial.
+- Update dengan Where: Bisa mengupdate banyak record sekaligus tanpa mengambilnya terlebih dahulu: `db.Model(&Product{}).Where("price < ?", 50).Updates(Product{Price: 50})`.

@@ -1,12 +1,9 @@
-# Relasi (Overview Singkat)
+# Challenge
 
-## Penjelasan
-
-- Database relasional seringkali memiliki hubungan antar tabel (misal: satu User memiliki banyak Post, satu Product dimiliki oleh satu Category). GORM memungkinkan pendefinisian relasi ini dalam struct Go.
-- Jenis Relasi: One-to-One, One-to-Many, Many-to-Many.
-- Pendefinisian: Ditentukan dengan menambahkan field struct yang merupakan pointer atau slice ke struct model lain, seringkali dikombinasikan dengan tag `gorm:"..."` seperti `foreignKey`, `references`, `many2many`.
-
-## Loading Relasi
-
-- Lazy Loading: Relasi tidak diambil secara otomatis saat query model utama. Perlu query terpisah untuk mengambil data relasi (berpotensi N+1 problem).
-- Eager Loading: Mengambil data relasi bersamaan dengan model utama, biasanya menggunakan metode `Preload()`. Ini lebih efisien untuk mengambil banyak data relasi sekaligus.
+- TODO: 1. Buat beberapa User baru (jika belum ada atau ingin data bersih)
+- TODO: 2. Buat beberapa Post baru, hubungkan dengan User menggunakan UserID
+- TODO: 3. Query (Read) semua Post dan tampilkan
+- TODO: 4. Query (Read) semua Post milik User tertentu (gunakan Where atau Preload)
+- TODO: 5. Update judul dari salah satu Post
+- TODO: 6. Soft Delete salah satu Post
+- TODO: 7. Coba cari Post yang di-soft delete (query biasa vs Unscoped)

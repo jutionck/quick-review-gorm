@@ -19,7 +19,6 @@ type User struct {
 	ID    uint   `gorm:"primaryKey"` // Kustomisasi primary key
 	Name  string `gorm:"not null"`
 	Email string `gorm:"unique;size:100"` // Kolom 'email' unique, tipe varchar(100)
-	// Field untuk soft delete akan ditambahkan di branch selanjutnya
 	// DeletedAt gorm.DeletedAt `gorm:"index"`
 }
 
@@ -48,7 +47,13 @@ func main() {
 	}()
 
 	// --- Bagian 3: Auto Migrate ---
-	// Kode AutoMigrate akan ditambahkan di branch selanjutnya.
+	log.Println("Running auto migration...")
+	// AutoMigrate akan membuat/memperbarui skema tabel berdasarkan model.
+	err = db.AutoMigrate(&Task{}, &User{})
+	if err != nil {
+		log.Fatalf("Failed to auto migrate: %v", err)
+	}
+	log.Println("Database auto migration finished. Tables created/updated.")
 
 	// --- Bagian 4: Operasi CRUD ---
 	// Kode Create, Read, Update, Delete akan ditambahkan di branch selanjutnya.
